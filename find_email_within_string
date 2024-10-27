@@ -1,0 +1,14 @@
+import re
+
+def find_emails(text):
+    # Ορισμός του regex για email
+    email_pattern = r'[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}'
+    # Χρησιμοποίηση του findall για να επιστρέψει όλα τα email που ταιριάζουν στο κείμενο
+    emails = re.findall(email_pattern, text)
+    return emails
+
+# Παράδειγμα χρήσης
+text = "Εδώ είναι κάποια emails: john.doe@example.com, jane_smith@website.gr και info@company.co.uk"
+found_emails = find_emails(text)
+
+print("Τα emails που βρέθηκαν είναι:", found_emails)

@@ -1,0 +1,7 @@
+import pandas as pd
+import numpy as np
+
+quantities = np.array([45, 30, 80, 20])
+fruits = pd.Series(quantities, index=['Apples', 'Oranges', 'Bananas', 'Grapes'])
+
+print(fruits)

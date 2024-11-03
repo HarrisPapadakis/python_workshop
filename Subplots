@@ -1,0 +1,12 @@
+import matplotlib.pyplot as plt
+
+investment_types = ['Stocks', 'Bonds', 'Mutual Funds', 'Real Estate', 'Cryptocurrency']
+returns = [7.4, 2.8, 5.2, 9.3, 14.2]
+
+fig, ax = plt.subplots(figsize=(10, 5))
+ax.bar(investment_types, returns)
+ax.set_title('Investment Returns in 2023')
+ax.set_xlabel('Investment Type')
+ax.set_ylabel('Returns (%)')
+
+plt.show()

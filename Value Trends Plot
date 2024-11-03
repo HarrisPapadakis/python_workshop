@@ -1,0 +1,17 @@
+import matplotlib.pyplot as plt
+import numpy as np
+
+years = np.arange(2000, 2011)
+data1 = np.random.randint(20,50,11)
+data2 = np.random.randint(30,60,11)
+
+plt.figure(figsize=(12, 6))
+plt.plot(years, data1, label='Dataset 1')
+plt.plot(years, data2, label='Dataset 2')
+
+plt.xlabel('Year')
+plt.ylabel('Values')
+plt.title('Value Trends for Dataset 1 and Dataset 2 (2000-2010)')
+plt.legend()
+
+plt.show()

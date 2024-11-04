@@ -1,0 +1,20 @@
+import pandas as pd
+
+vendor_data = {
+    'Vendor': ['Vendor A', 'Vendor B', 'Vendor C', 'Vendor D', 'Vendor E'],
+    'Items Sold': [1300, 1800, 1450, 1550, 1600],
+    'Revenue Generated': [4000, 5500, 4500, 4800, 4950]
+}
+
+vendor_df = pd.DataFrame(vendor_data)
+
+# Calculate mean, median, and standard deviation for each KPI
+for kpi in ['Items Sold', 'Revenue Generated']:
+    mean_kpi = vendor_df[kpi].mean()
+    median_kpi = vendor_df[kpi].median()
+    std_dev_kpi = vendor_df[kpi].std()
+
+    print(f"{kpi}:\nMean: {mean_kpi}\nMedian: {median_kpi}\nStandard Deviation: {std_dev_kpi}\n")
+
+correlation_sales_revenue = vendor_df['Items Sold'].corr(vendor_df['Revenue Generated'])
+print(f"Correlation between Items Sold and Revenue Generated: {correlation_sales_revenue}")

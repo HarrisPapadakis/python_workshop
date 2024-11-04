@@ -1,0 +1,21 @@
+import pandas as pd
+import numpy as np
+from scipy import stats
+
+# Define the DataFrame
+data = {'Name': ['John', 'Jane', 'Jack', 'Jill', 'Joe', 'Joachim', 'Jackson', 'Jerry'],
+        'Age': [34, 36, 29, 22, 29, 26, 27, 41]}
+df = pd.DataFrame(data)
+
+# Compute the average age
+average_age = np.mean(df['Age'])
+print(f"The average age is {average_age} years.")
+
+# Test if the age distribution is normal
+k2, p = stats.normaltest(df['Age'])
+alpha = 0.05  # Significance level
+print(f"p = {p:.5f}")
+if p < alpha:
+    print("The null hypothesis can be rejected; the age is not normally distributed.")
+else:
+    print("The null hypothesis cannot be rejected; the age is normally distributed.")

@@ -1,0 +1,69 @@
+import random
+
+class Backgammon:
+    def __init__(self):
+        # Δημιουργία του ταμπλό με αρχικές θέσεις για ένα τυπικό παιχνίδι
+        self.board = [0] * 24  # 24 σημεία στο ταμπλό
+        self.board[0], self.board[23] = 2, -2  # 2 μαύρα και 2 άσπρα πούλια
+        self.board[5], self.board[18] = -5, 5  # 5 άσπρα και 5 μαύρα πούλια
+        self.board[7], self.board[16] = -3, 3  # 3 άσπρα και 3 μαύρα πούλια
+        self.board[11], self.board[12] = 5, -5  # 5 μαύρα και 5 άσπρα πούλια
+
+    def roll_dice(self):
+        # Ρίψη δύο ζαριών
+        dice1, dice2 = random.randint(1, 6), random.randint(1, 6)
+        return (dice1, dice2) if dice1 != dice2 else (dice1, dice1, dice1, dice1)
+
+    def display_board(self):
+        # Εμφανίζει το ταμπλό
+        print("Ταμπλό:")
+        for i, count in enumerate(self.board):
+            if count > 0:
+                print(f"{i+1}: Μαύρα {count}")
+            elif count < 0:
+                print(f"{i+1}: Άσπρα {-count}")
+            else:
+                print(f"{i+1}: Κενό")
+
+    def move(self, start, steps, player):
+        # Εκτελεί την κίνηση ενός παίκτη
+        end = start + steps if player == "Μαύρα" else start - steps
+        if end < 0 or end >= len(self.board):
+            print("Άκυρη κίνηση: εκτός ταμπλό.")
+            return False
+        if (self.board[end] < -1 and player == "Μαύρα") or (self.board[end] > 1 and player == "Άσπρα"):
+            print("Άκυρη κίνηση: η θέση είναι κατειλημμένη από τον αντίπαλο.")
+            return False
+
+        # Ενημερώνει το ταμπλό
+        self.board[start] -= 1 if player == "Μαύρα" else -1
+        self.board[end] += 1 if player == "Μαύρα" else -1
+        return True
+
+    def play_turn(self, player):
+        dice = self.roll_dice()
+        print(f"{player} έριξε τα ζάρια: {dice}")
+        moves = len(dice)
+        while moves > 0:
+            try:
+                start = int(input(f"Δώσε την αρχική θέση για τα {player}: ")) - 1
+                steps = dice[moves - 1]
+                if self.move(start, steps, player):
+                    moves -= 1
+                    self.display_board()
+                else:
+                    print("Δοκιμάστε ξανά.")
+            except ValueError:
+                print("Παρακαλώ δώστε έναν αριθμό.")
+
+    def play_game(self):
+        # Παιχνίδι με εναλλαγή γύρων για δύο παίκτες
+        player = "Μαύρα"
+        while True:
+            self.display_board()
+            self.play_turn(player)
+            player = "Άσπρα" if player == "Μαύρα" else "Μαύρα"
+
+if __name__ == "__main__":
+    game = Backgammon()
+    game.play_game()

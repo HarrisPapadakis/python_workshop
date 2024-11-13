@@ -1,0 +1,51 @@
+import pandas as pd
+import matplotlib.pyplot as plt
+
+def load_data(file_path):
+    """Φορτώνει το αρχείο δεδομένων από το CSV."""
+    try:
+        data = pd.read_csv(file_path)
+        print("Τα δεδομένα φορτώθηκαν επιτυχώς!")
+        return data
+    except FileNotFoundError:
+        print("Σφάλμα: Το αρχείο δεν βρέθηκε.")
+        return None
+
+def calculate_statistics(data):
+    """Υπολογίζει βασικά στατιστικά για τις αριθμητικές στήλες."""
+    print("Στατιστικά:")
+    print(data.describe())
+
+def plot_data(data, column):
+    """Δημιουργεί γραφική παράσταση για μία επιλεγμένη στήλη."""
+    plt.figure(figsize=(10, 6))
+    plt.plot(data['Date'], data[column], marker='o', linestyle='-', color='b')
+    plt.xlabel("Ημερομηνία")
+    plt.ylabel(column)
+    plt.title(f"Γραφική Παράσταση για {column}")
+    plt.xticks(rotation=45)
+    plt.tight_layout()
+    plt.show()
+
+def main():
+    # Φόρτωσε το αρχείο δεδομένων
+    file_path = input("Δώσε το όνομα του αρχείου CSV (π.χ., 'data.csv'): ")
+    data = load_data(file_path)
+    if data is None:
+        return
+    
+    # Υπολόγισε και εμφάνισε στατιστικά
+    calculate_statistics(data)
+    
+    # Επέλεξε τη στήλη για οπτικοποίηση
+    print("Στήλες διαθέσιμες για γραφική παράσταση:", data.columns)
+    column = input("Διάλεξε στήλη για γραφική παράσταση: ")
+    
+    if column in data.columns:
+        plot_data(data, column)
+    else:
+        print("Σφάλμα: Η στήλη δεν βρέθηκε.")
+
+# Εκκίνηση του προγράμματος
+if __name__ == "__main__":
+    main()

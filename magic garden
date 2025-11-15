@@ -524,4 +524,4 @@ pygame.quit()
 # pyinstaller --onefile --windowed magic_garden_cartoon.py
 # Αν θέλεις να συμπεριλάβεις icons/ήχους, χρησιμοποίησε --add-data
 
-Εστάλη από Outlook για iOS
+

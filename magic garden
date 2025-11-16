@@ -1,527 +1,536 @@
-# magic_garden_cartoon.py
-# Παιχνίδι "Μαγικός Κήπος" - Καρτουνίστικο (pygame)
-# Απαραίτητες βιβλιοθήκες: pygame, numpy
-# pip install pygame numpy
-
 import pygame
 import random
-import json
-import os
 import sys
-from datetime import datetime
+import time
+import json 
+import os 
 
-# Προσπαθούμε να εισάγουμε numpy για να φτιάξουμε ήχους από κύματα.
-try:
-    import numpy as np
-except Exception as e:
-    print("Απαιτείται numpy για τους ενσωματωμένους ήχους.")
-    print("Εγκατάσταση: pip install numpy")
-    raise
-
-# ---------------- Ρυθμίσεις ----------------
-WIDTH, HEIGHT = 1000, 700
-FPS = 40
-PROGRESS_FILE = ".magic_garden_progress.json"
-
-# ---------------- Αρχικοποίηση Pygame ----------------
+# --- GLOBAL SETUP ---
 pygame.init()
 pygame.mixer.init()
+
+WIDTH, HEIGHT = 800, 600
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
-pygame.display.set_caption("Μαγικός Κήπος - Cartoon Edition 🌸")
-clock = pygame.time.Clock()
+pygame.display.set_caption("🌱 Magic Garden – Start Screen")
 
-# Γραμματοσειρές
-def get_font(size, bold=False):
-    try:
-        return pygame.font.SysFont("comic sans ms", size, bold=bold)
-    except:
-        return pygame.font.SysFont(None, size, bold=bold)
+# ----------- COLORS (ΧΡΩΜΑΤΑ) ------------
+WHITE = (255,255,255)
+BLACK = (0,0,0)
+GREEN = (70,200,90)
+LIGHT_BLUE = (140,200,255)
+RED = (255,100,100)
+PURPLE = (180,140,255)
+DARK_PURPLE = (80, 50, 150)
+LIGHT_GREY = (220, 220, 220)
+GOLD = (255, 215, 0) 
 
-BIG = get_font(48, bold=True)
-MED = get_font(28)
-SMALL = get_font(20)
+# ----------- FONTS (ΓΡΑΜΜΑΤΟΣΕΙΡΕΣ) ------------
+font = pygame.font.SysFont("Comic Sans MS", 36)
+big_font = pygame.font.SysFont("Comic Sans MS", 50)
+small_font = pygame.font.SysFont("Comic Sans MS", 26)
+# **ΔΙΟΡΘΩΣΗ AVATAR:** Χρησιμοποιούμε Segoe UI Emoji για Windows
+avatar_font = pygame.font.SysFont("Segoe UI Emoji", 40) 
 
-# ---------------- Χρώματα καρτουνίστικα ----------------
-BG = (252, 240, 255)            # απαλό ροζ-μοβ
-CARD = (255, 255, 255)
-TITLE = (120, 20, 150)
-BUTTON_BG = (255, 180, 220)
-BUTTON_HOVER = (255, 140, 190)
-TEXT = (40, 20, 50)
-PLANT_GREEN = (80, 200, 120)
-DARK_GREEN = (10,140,40)
-POT_BROWN = (130,80,40)
-YELLOW = (255, 224, 102)
-LIGHT = (255,255,204)
+# ----------- AVATARS & DATA ------------
+AVATAR_ICONS = ["🌱", "👦", "👧", "🐸", "🧚"]
+DEFAULT_PLANT_LEVEL = 0
+DEFAULT_SCORE = 0
+DEFAULT_STREAK = 0
 
-# ---------------- Αποθήκευση / Φόρτωση προόδου ----------------
+# --- ΔΙΑΔΡΟΜΗ ΑΡΧΕΙΟΥ ΕΙΚΟΝΑΣ ---
+try:
+    BACKGROUND_IMAGE = pygame.image.load("magic_garden.png").convert() 
+    BACKGROUND_IMAGE = pygame.transform.scale(BACKGROUND_IMAGE, (WIDTH, HEIGHT))
+except pygame.error:
+    print("ΔΕΝ ΒΡΕΘΗΚΕ Η ΕΙΚΟΝΑ ΦΟΝΤΟΥ. Χρησιμοποιείται χρώμα.")
+    BACKGROUND_IMAGE = None
+
+# --- ΑΡΧΕΙΑ ΑΠΟΘΗΚΕΥΣΗΣ ---
+SAVE_FILE = "garden_save.json"
+
+# ----------- SOUNDS (ΗΧΟΙ) ------------
+try:
+    sound_correct = pygame.mixer.Sound("C:/Windows/Media/Windows Ding.wav")
+    sound_wrong = pygame.mixer.Sound("C:/Windows/Media/Windows Error.wav")
+except pygame.error as e:
+    print(f"⚠️ Σφάλμα φόρτωσης ήχων των Windows: {e}")
+    sound_correct = pygame.mixer.Sound(size=22050)
+    sound_wrong = pygame.mixer.Sound(size=22050)
+
+# ---------------------------------------------------------
+# 🟢 UTILS (ΒΟΗΘΗΤΙΚΕΣ ΣΥΝΑΡΤΗΣΕΙΣ)
+# ---------------------------------------------------------
+
 def load_progress():
-    if os.path.exists(PROGRESS_FILE):
-        try:
-            with open(PROGRESS_FILE, "r", encoding="utf-8") as f:
-                return json.load(f)
-        except:
-            return {}
-    return {}
+    """Φορτώνει την πρόοδο όλων των παικτών."""
+    try:
+        with open(SAVE_FILE, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        return {} 
 
 def save_progress(data):
-    try:
-        with open(PROGRESS_FILE, "w", encoding="utf-8") as f:
-            json.dump(data, f, ensure_ascii=False, indent=2)
-    except Exception as e:
-        print("Σφάλμα αποθήκευσης:", e)
+    """Αποθηκεύει την πρόοδο όλων των παικτών."""
+    try:
+        with open(SAVE_FILE, 'w', encoding='utf-8') as f:
+            json.dump(data, f, indent=4, ensure_ascii=False)
+    except IOError as e:
+        print(f"Σφάλμα κατά την αποθήκευση: {e}")
 
-progress = load_progress()
-progress.setdefault("total_played", 0)
-progress.setdefault("total_correct", 0)
-progress.setdefault("by_table", {})
-progress.setdefault("history", [])
+def draw_text_center(surf, text, y, font, color=BLACK, x=WIDTH // 2):
+    label = font.render(text, True, color)
+    rect = label.get_rect(center=(x, y))
+    surf.blit(label, rect)
 
-# ---------------- Ηχητικός Γεννήτορας (numpy -> pygame Sound) ----------------
-def generate_tone(freq, duration=0.18, volume=0.6, waveform='sine'):
-    sample_rate = 44100
-    t = np.linspace(0, duration, int(sample_rate*duration), False)
-    if waveform == 'sine':
-        wave = np.sin(freq * t * 2 * np.pi)
-    elif waveform == 'square':
-        wave = np.sign(np.sin(freq * t * 2 * np.pi))
-    elif waveform == 'triangle':
-        wave = 2*np.arcsin(np.sin(freq*2*np.pi*t))/np.pi
-    else:
-        wave = np.sin(freq * t * 2 * np.pi)
-    audio = (wave * volume * 32767).astype(np.int16)
-    stereo = np.column_stack((audio, audio))
-    return pygame.sndarray.make_sound(stereo.copy())
+def draw_text(surf, text, pos, font, color): 
+    label = font.render(text, True, color)
+    surf.blit(label, pos)
 
-# Ήχοι παιχνιδιάρικοι
-sound_correct = generate_tone(1000, 0.18, 0.6, 'triangle')
-sound_wrong   = generate_tone(220, 0.28, 0.6, 'square')
-sound_click   = generate_tone(700, 0.08, 0.45, 'sine')
-sound_levelup = generate_tone(1400, 0.25, 0.6, 'sine')
-# μικρή μελωδία (προαιρετική)
-def play_victory_melody():
-    # απλή διαδοχή τόνων
-    for f,d in [(700,0.09),(900,0.09),(1100,0.12)]:
-        s = generate_tone(f, d, 0.5, 'triangle')
-        s.play()
-        pygame.time.delay(int(d*1000))
+# ---------------------------------------------------------
+# 🟢 UI ELEMENTS (ΣΤΟΙΧΕΙΑ UI) - FancyButton παραμένει ίδια
+# ---------------------------------------------------------
 
-# ---------------- UI Components ----------------
-class Button:
-    def __init__(self, x,y,w,h,text, big=False):
-        self.rect = pygame.Rect(x,y,w,h)
-        self.text = text
-        self.big = big
-    def draw(self, surf):
-        mx,my = pygame.mouse.get_pos()
-        hover = self.rect.collidepoint(mx,my)
-        color = BUTTON_HOVER if hover else BUTTON_BG
-        pygame.draw.rect(surf, color, self.rect, border_radius=14)
-        pygame.draw.rect(surf, (255,255,255), self.rect.inflate(-6,-6), border_radius=12)
-        txt = BIG.render(self.text, True, TITLE) if self.big else MED.render(self.text, True, TITLE)
-        surf.blit(txt, (self.rect.x + (self.rect.width-txt.get_width())//2,
-                        self.rect.y + (self.rect.height-txt.get_height())//2))
-        return hover
-    def clicked(self, mx,my):
-        return self.rect.collidepoint(mx,my)
+class FancyButton:
+    def __init__(self, text, x, y, w, h, base_color, hover_color, action=None):
+        self.text = text
+        self.base_rect = pygame.Rect(x, y, w, h)
+        self.rect = self.base_rect.copy()
+        self.base_color = base_color
+        self.hover_color = hover_color
+        self.action = action
+        self.is_hovered = False
 
-# ---------------- Παιχνίδι ----------------
-class MagicGarden:
-    def __init__(self):
-        self.state = "menu"  # menu, playing, results
-        self.score = 0
-        self.streak = 0
-        self.plant_level = 0  # 0..4
-        self.asked = 0
-        self.current_q = None
-        self.correct_answer = None
-        self.answer_text = ""
-        self.max_questions = 12
-        self.selected_table = None
-        self.repeat_pool = []
-        # animations
-        self.animation = None        # "success","wrong","grow"
-        self.animation_timer = 0
-        self.animation_duration = 400  # ms
-        # pop visual scale for plant growth
-        self.plant_pop_scale = 1.0
-        # fairy guide bobbing
-        self.fairy_offset = 0
-        self.fairy_dir = 1
-        # start time of session
-        self.start_time = None
-        self.end_time = None
+    def draw(self, surf):
+        mouse_pos = pygame.mouse.get_pos()
+        self.is_hovered = self.base_rect.collidepoint(mouse_pos)
 
-    def pick_question(self):
-        if self.repeat_pool and random.random() < 0.6:
-            return random.choice(self.repeat_pool)
-        if self.selected_table:
-            return (self.selected_table, random.randint(1,10))
-        return (random.randint(1,10), random.randint(1,10))
+        scale = 1.0
+        if self.is_hovered:
+            scale = 1.05
+        
+        new_w = int(self.base_rect.width * scale)
+        new_h = int(self.base_rect.height * scale)
+        self.rect.width = new_w
+        self.rect.height = new_h
+        self.rect.center = self.base_rect.center
 
-    def new_question(self):
-        a,b = self.pick_question()
-        self.current_q = (a,b)
-        self.correct_answer = a*b
-        self.answer_text = ""
-        self.asked += 1
+        current_color = self.hover_color if self.is_hovered else self.base_color
+        
+        pygame.draw.rect(surf, current_color, self.rect, border_radius=15)
+        pygame.draw.rect(surf, DARK_PURPLE, self.rect, 4, border_radius=15)
 
-    def submit_answer(self):
-        try:
-            val = int(self.answer_text.strip())
-        except:
-            return None
-        correct = (val == self.correct_answer)
+        label = font.render(self.text, True, BLACK)
+        text_rect = label.get_rect(center=self.rect.center)
+        surf.blit(label, text_rect)
 
-        progress["total_played"] += 1
-        key = str(self.current_q[0])
-        tbl = progress["by_table"].setdefault(key, {"asked":0, "correct":0})
-        tbl["asked"] += 1
+    def check(self, pos):
+        return self.base_rect.collidepoint(pos)
 
-        # animation timestamp
-        self.animation_timer = pygame.time.get_ticks()
 
-        if correct:
-            sound_correct.play()
-            self.score += 1
-            self.streak += 1
-            tbl["correct"] += 1
-            progress["total_correct"] += 1
+# ---------------------------------------------------------
+# 🟢 LOGIN SCREEN CLASS (ΤΡΟΠΟΠΟΙΗΜΕΝΗ)
+# ---------------------------------------------------------
 
-            # success animation
-            self.animation = "success"
+class LoginScreen:
+    def __init__(self, players_data):
+        self.players_data = players_data
+        self.login_text = ""
+        self.error_message = ""
+        self.selected_avatar = 0 
+        
+        # Κουμπί START/ΣΥΝΕΧΕΙΑ
+        self.start_button = FancyButton(
+            "START / Συνέχισε", 
+            WIDTH // 2 - 150, 
+            280, 
+            300, 
+            60, 
+            GREEN, 
+            LIGHT_BLUE
+        )
+        
+        # **ΝΕΟ:** Κουμπί ΕΞΟΔΟΥ
+        self.quit_button = FancyButton(
+            "🚪 Έξοδος", 
+            WIDTH // 2 - 150, 
+            350, 
+            300, 
+            60, 
+            RED, 
+            (255, 150, 150)
+        )
+        
+        # Ορθογώνια για τα avatars
+        self.avatar_rects = []
+        x_start = WIDTH // 2 - (len(AVATAR_ICONS) * 60) // 2 + 10
+        for i in range(len(AVATAR_ICONS)):
+            self.avatar_rects.append(pygame.Rect(x_start + i * 60, 210, 50, 50))
+        
+        self.running = True
 
-            # plant growth on streak
-            if self.streak % 3 == 0 and self.plant_level < 4:
-                self.plant_level += 1
-                self.animation = "grow"
-                sound_levelup.play()
-                # slightly larger pop
-                self.plant_pop_scale = 1.25
-                # small victory melody occasionally
-                if self.plant_level == 4:
-                    play_victory_melody()
-            # reduce repeat_pool if present
-            if self.current_q in self.repeat_pool:
-                try:
-                    self.repeat_pool.remove(self.current_q)
-                except:
-                    pass
-        else:
-            sound_wrong.play()
-            self.streak = 0
-            if self.plant_level > 0:
-                self.plant_level -= 1
-            self.animation = "wrong"
-            # add to repeat pool (more weight)
-            self.repeat_pool += [self.current_q]*2
+    def draw_card(self, surf, rect, color):
+        shadow_rect = rect.copy()
+        shadow_rect.y += 5
+        pygame.draw.rect(surf, BLACK, shadow_rect, border_radius=10) 
+        pygame.draw.rect(surf, color, rect, border_radius=10)
+        pygame.draw.rect(surf, DARK_PURPLE, rect, 3, border_radius=10) 
 
-        progress["history"].append({
-            "time": datetime.now().isoformat(),
-            "question": f"{self.current_q[0]}x{self.current_q[1]}",
-            "given": val,
-            "correct": self.correct_answer,
-            "ok": correct
-        })
-        save_progress(progress)
-        return correct
+    def draw_scores_card(self, surf):
+        card_rect = pygame.Rect(50, 420, WIDTH - 100, 150)
+        self.draw_card(surf, card_rect, LIGHT_GREY)
+        
+        draw_text_center(surf, "📜 Υπάρχοντες Παίκτες", 440, font, DARK_PURPLE, card_rect.centerx)
 
-    def update_fairy(self):
-        # μικρό bobbing animation για τη νεράιδα (fairy)
-        self.fairy_offset += 0.6 * self.fairy_dir
-        if abs(self.fairy_offset) > 8:
-            self.fairy_dir *= -1
+        y = 480
+        sorted_players = sorted(self.players_data.items(), 
+                                key=lambda item: item[1].get('score', 0), 
+                                reverse=True)
 
-game = MagicGarden()
+        for name, data in sorted_players[:4]: 
+            # Χρησιμοποιούμε την καθορισμένη γραμματοσειρά για το avatar
+            icon = avatar_font.render(AVATAR_ICONS[data.get('avatar', 0)], True, BLACK)
+            text = small_font.render(f"{name} — Σκορ: {data.get('score', 0)}", True, BLACK)
+            
+            # Υπολογισμός θέσης
+            total_width = icon.get_width() + text.get_width() + 10 # 10 pixels spacing
+            start_x = card_rect.centerx - total_width // 2
+            
+            surf.blit(icon, (start_x, y - 5))
+            surf.blit(text, (start_x + icon.get_width() + 10, y))
+            y += 30
 
-# Buttons
-btn_start = Button(60, 480, 260, 80, "Ξεκίνα Παιχνίδι", big=True)
-btn_all = Button(60, 180, 260, 60, "Όλες οι προπαίδειες")
-table_buttons = [Button(360 + i*110, 180, 90, 60, str(i)) for i in range(1,11)]
-btn_quit = Button(WIDTH-220, HEIGHT-110, 180, 70, "Έξοδος", big=True)
-btn_menu_back = Button(60, 580, 200, 60, "Πίσω στο Μενού")
+    def draw(self, surf):
+        # Φόντο
+        if BACKGROUND_IMAGE:
+            surf.blit(BACKGROUND_IMAGE, (0, 0))
+        else:
+            surf.fill((230,245,255))
+        
+        draw_text_center(surf, "🌱 Καλώς Ήρθες στο Magic Garden!", 50, big_font, DARK_PURPLE)
 
-# ---------------- Cartoon Fairy / Guide ----------------
-def draw_fairy(surf, x, y, offset):
-    # απλό καρτούν σχέδιο νεράιδας με φτερά
-    cx, cy = x, y + int(offset)
-    # φτερά
-    wing = pygame.Surface((150,120), pygame.SRCALPHA)
-    pygame.draw.ellipse(wing, (255,240,255,190), (0,10,110,80))
-    pygame.draw.ellipse(wing, (230,220,255,190), (40,0,110,80))
-    surf.blit(wing, (cx-70, cy-40))
-    # σώμα
-    pygame.draw.circle(surf, (255,220,240), (cx, cy), 28)
-    # μαλλιά
-    pygame.draw.polygon(surf, (255,190,240), [(cx-28,cy-8),(cx-6,cy-22),(cx+20,cy-8)])
-    # μάτια & χαμόγελο
-    pygame.draw.rect(surf, (30,30,30), (cx-8,cy-4,5,5))
-    pygame.draw.rect(surf, (30,30,30), (cx+4,cy-4,5,5))
-    pygame.draw.arc(surf, (30,30,30), (cx-12,cy,24,16), 3.14, 2*3.14, 2)
+        # Input Card (Σμίκρυνση κάρτας για να χωρέσει το Quit Button)
+        input_card_rect = pygame.Rect(WIDTH//2 - 200, 100, 400, 320)
+        self.draw_card(surf, input_card_rect, WHITE)
+        
+        # Οδηγία
+        draw_text_center(surf, "1. Γράψε το όνομά σου:", 125, font, BLACK)
+        
+        # Input Box
+        input_rect = pygame.Rect(WIDTH//2 - 150, 150, 300, 40)
+        pygame.draw.rect(surf, LIGHT_GREY, input_rect, border_radius=8)
+        pygame.draw.rect(surf, BLACK, input_rect, 2, border_radius=8)
 
-# ---------------- Animations (drawing helpers) ----------------
+        name_label = small_font.render(self.login_text, True, BLACK)
+        surf.blit(name_label, (input_rect.x + 10, input_rect.y + 7))
+
+        # Avatar Picker
+        draw_text_center(surf, "2. Διάλεξε Avatar:", 200, font, BLACK)
+        
+        for i, rect in enumerate(self.avatar_rects):
+            color = PURPLE if i == self.selected_avatar else LIGHT_GREY
+            
+            if rect.collidepoint(pygame.mouse.get_pos()):
+                 color = LIGHT_BLUE
+                 
+            pygame.draw.rect(surf, color, rect, border_radius=8)
+            pygame.draw.rect(surf, DARK_PURPLE, rect, 2, border_radius=8)
+            
+            avatar_label = avatar_font.render(AVATAR_ICONS[i], True, BLACK)
+            surf.blit(avatar_label, (rect.x + 5, rect.y - 2))
+
+        # Buttons
+        self.start_button.draw(surf)
+        self.quit_button.draw(surf) # **ΝΕΟ** Κουμπί εξόδου
+        
+        # Error Message
+        if self.error_message:
+            draw_text_center(surf, self.error_message, 400, small_font, RED)
+
+        # Scores Card
+        self.draw_scores_card(surf)
+
+    def handle_event(self, event):
+        if event.type == pygame.MOUSEBUTTONDOWN:
+            mouse_pos = event.pos
+            
+            # Έλεγχος κλικ Avatar
+            for i, rect in enumerate(self.avatar_rects):
+                if rect.collidepoint(mouse_pos):
+                    self.selected_avatar = i
+                    break
+
+            # Έλεγχος κλικ START Button
+            if self.start_button.check(mouse_pos):
+                player_name = self.login_text.strip()
+                if player_name:
+                    if player_name not in self.players_data:
+                        self.players_data[player_name] = {
+                            'score': DEFAULT_SCORE,
+                            'streak': DEFAULT_STREAK,
+                            'plant_level': DEFAULT_PLANT_LEVEL,
+                            'avatar': self.selected_avatar 
+                        }
+                        save_progress(self.players_data)
+                    self.running = False
+                    return player_name
+                else:
+                    self.error_message = "Παρακαλώ εισάγετε ένα όνομα."
+            
+            # **ΝΕΟ** Έλεγχος κλικ QUIT Button
+            if self.quit_button.check(mouse_pos):
+                pygame.quit()
+                sys.exit()
+                    
+        if event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_BACKSPACE:
+                self.login_text = self.login_text[:-1]
+            elif event.key == pygame.K_RETURN:
+                if self.login_text.strip():
+                    return self.handle_event(pygame.event.Event(pygame.MOUSEBUTTONDOWN, {'pos': self.start_button.rect.center}))
+                else:
+                    self.error_message = "Παρακαλώ εισάγετε ένα όνομα."
+            elif event.unicode.isalnum() or event.unicode in (' ', '_'):
+                if len(self.login_text) < 15:
+                    self.login_text += event.unicode
+        
+        return None
+
+# ---------------------------------------------------------
+# 🟢 GAME CLASS (ΤΡΟΠΟΠΟΙΗΜΕΝΗ ΓΙΑ SPLASH SCREEN)
+# ---------------------------------------------------------
+
+class MagicGardenGame:
+    def __init__(self):
+        # **ΑΛΛΑΓΗ:** Αρχική κατάσταση "splash"
+        self.state = "splash" 
+        self.splash_start_time = pygame.time.get_ticks()
+        self.splash_duration = 3000 # 3 δευτερόλεπτα
+        
+        self.current_player = None
+        self.players_data = load_progress() 
+        
+        self.score = 0
+        self.streak = 0
+        self.plant_level = 0
+        self.avatar_index = 0
+        
+        self.animation = None
+        self.animation_timer = 0
+        self.animation_duration = 500
+        
+        self.login_screen = LoginScreen(self.players_data) 
+        
+        self.generate_question()
+        self.answer_text = ""
+
+    def load_player_data(self, player_name):
+        self.current_player = player_name
+        data = self.players_data.get(player_name, {})
+        
+        self.score = data.get('score', DEFAULT_SCORE)
+        self.streak = data.get('streak', DEFAULT_STREAK)
+        self.plant_level = data.get('plant_level', DEFAULT_PLANT_LEVEL)
+        self.avatar_index = data.get('avatar', 0) 
+        
+        self.generate_question()
+        self.state = "playing"
+
+    def save_player_data(self):
+        if self.current_player:
+            self.players_data[self.current_player]['score'] = self.score
+            self.players_data[self.current_player]['streak'] = self.streak
+            self.players_data[self.current_player]['plant_level'] = self.plant_level
+            save_progress(self.players_data)
+        
+    def generate_question(self):
+        a = random.randint(1,12)
+        b = random.randint(1,10)
+        self.current_q = (a, b)
+        self.correct_answer = a * b
+
+    def submit_answer(self):
+        if not self.answer_text: return
+        try:
+            ans = int(self.answer_text)
+        except ValueError: return
+
+        if ans == self.correct_answer:
+            sound_correct.play()
+            self.score += 1
+            self.streak += 1
+            
+            self.animation = "correct_burst" 
+            self.animation_timer = pygame.time.get_ticks()
+
+            if self.streak % 3 == 0 and self.plant_level < MAX_PLANT_LEVEL:
+                self.plant_level += 1
+                self.animation = "grow" 
+                self.animation_timer = pygame.time.get_ticks()
+            
+            self.save_player_data() 
+
+        else:
+            sound_wrong.play()
+            self.streak = 0
+            self.animation = "wrong"
+            self.animation_timer = pygame.time.get_ticks()
+
+        self.generate_question()
+        self.answer_text = ""
+
+# ... (Οι συναρτήσεις animation παραμένουν ίδιες) ...
 def draw_success_animation(surf, x, y, progress):
-    # λαμπερός κύκλος που σβήνει και μικρά αστέρια
-    alpha = max(0, int(255 * (1 - progress)))
-    radius = int(130 * (1 - progress) + 10)
-    s = pygame.Surface((radius*2, radius*2), pygame.SRCALPHA)
-    pygame.draw.circle(s, (255,250,150, alpha), (radius, radius), radius)
-    surf.blit(s, (x - radius, y - radius))
-    # starlets
-    for i in range(6):
-        ang = i * (360/6) + progress*360*2
-        sx = int(x + (radius//2) * random.uniform(0.6,1.0) * math_cos(ang))
-        sy = int(y + (radius//2) * random.uniform(0.6,1.0) * math_sin(ang))
-        pygame.draw.circle(surf, (255,240,200, max(20, alpha//2)), (sx,sy), 4)
+    size = int(180 * (1 - progress))
+    alpha = int(255 * (1 - progress)**2)
+    sparkle = pygame.Surface((size*2, size*2), pygame.SRCALPHA)
+    pygame.draw.circle(sparkle, (255,255,0,alpha), (size,size), size)
+    surf.blit(sparkle, (x - size, y - size))
 
+def draw_correct_burst(surf, x, y, progress):
+    if progress >= 1: return
+    radius = int(20 * (1 - progress))
+    alpha = int(255 * (1 - progress))
+    pygame.draw.circle(surf, (255, 255, 100, alpha), (x, y), radius)
+    num_particles = 10
+    for i in range(num_particles):
+        angle = (i / num_particles) * 360
+        speed = 100 * progress
+        length = speed + random.randint(0, 10) 
+        rad = pygame.math.Vector2(1, 0).rotate(angle).normalize() 
+        px = x + rad.x * length * (1 - progress) 
+        py = y + rad.y * length * (1 - progress) 
+        size = int(8 * (1 - progress))
+        pygame.draw.rect(surf, GOLD, (px - size//2, py - size//2, size, size))
+        
 def apply_shake(x, strength, progress):
-    # επιστρέφει offset x ώστε το κείμενο να "τρομάζει"
-    max_off = int(strength * (1 - progress))
-    return x + random.randint(-max_off, max_off)
+    offset = int(strength * (1 - progress) * (2 - progress))
+    return x + random.randint(-offset, offset)
 
 def draw_growth_pop(surf, x, y, progress):
-    # πράσινη φούσκα που μεγαλώνει και εξαφανίζεται
-    size = int(20 + 80 * progress)
-    alpha = int(200 * (1 - progress))
-    s = pygame.Surface((size*2, size*2), pygame.SRCALPHA)
-    pygame.draw.circle(s, (180,255,180, alpha), (size, size), size)
-    pygame.draw.circle(s, (255,255,255, alpha//3), (int(size*0.6), int(size*0.6)), int(size*0.3))
-    surf.blit(s, (x-size, y-size))
+    size = int(50 + 60 * progress)
+    alpha = int(200 * (1 - progress))
+    bubble = pygame.Surface((size*2, size*2), pygame.SRCALPHA)
+    pygame.draw.circle(bubble, (100,255,100,alpha), (size,size), size)
+    surf.blit(bubble, (x - size, y - size))
+# --- ΤΕΛΟΣ ANIMATION FUNCTIONS ---
 
-# μικρές βοηθητικές για trig functions χωρίς πολλά imports
-import math
-def math_cos(d): return math.cos(math.radians(d))
-def math_sin(d): return math.sin(math.radians(d))
+# ---------------------------------------------------------
+# 🟢 MAIN GAME LOOP 
+# ---------------------------------------------------------
 
-# ---------------- Σχεδίαση φυτού (cartoon, με επίπεδα) ----------------
-def draw_cartoon_plant(surf, level, center_x, center_y, pop_scale=1.0):
-    # ζωγραφίζουμε καρτουνίστικο δοχείο και φυτό
-    # pot
-    pot_w = int(220 * pop_scale)
-    pot_h = int(90 * pop_scale)
-    pot = pygame.Rect(center_x - pot_w//2, center_y + 80, pot_w, pot_h)
-    pygame.draw.rect(surf, POT_BROWN, pot, border_radius=16)
-    pygame.draw.rect(surf, (160,110,70), pot.inflate(-20,-22), border_radius=12)
-    # roots / soil shine
-    pygame.draw.ellipse(surf, (90,60,40), (pot.x+10, pot.y-10, pot.width-20, 30))
-    # plant parts by level
-    base_x = center_x
-    base_y = center_y + 60
-    # stalk
-    if level >= 1:
-        pygame.draw.line(surf, DARK_GREEN, (base_x, base_y+30), (base_x, base_y-10), 12)
-        pygame.draw.circle(surf, PLANT_GREEN, (base_x, base_y-22), 18)
-    if level >= 2:
-        pygame.draw.line(surf, DARK_GREEN, (base_x, base_y+10), (base_x-35, base_y-5), 9)
-        pygame.draw.circle(surf, PLANT_GREEN, (base_x-36, base_y-18), 14)
-    if level >= 3:
-        pygame.draw.line(surf, DARK_GREEN, (base_x, base_y+10), (base_x+36, base_y-5), 9)
-        pygame.draw.circle(surf, PLANT_GREEN, (base_x+36, base_y-18), 14)
-    if level >= 4:
-        pygame.draw.line(surf, DARK_GREEN, (base_x, base_y+30), (base_x, base_y-80), 14)
-        pygame.draw.polygon(surf, PLANT_GREEN, [(base_x, base_y-80),(base_x-70, base_y-20),(base_x+70, base_y-20)])
-    # cute face on pot
-    eye_y = pot.y + 20
-    pygame.draw.circle(surf, (255,255,255), (pot.centerx-30, eye_y), 8)
-    pygame.draw.circle(surf, (255,255,255), (pot.centerx+30, eye_y), 8)
-    pygame.draw.circle(surf, (20,20,20), (pot.centerx-30, eye_y), 3)
-    pygame.draw.circle(surf, (20,20,20), (pot.centerx+30, eye_y), 3)
-    pygame.draw.arc(surf, (180,50,120), (pot.centerx-20, pot.y+28, 40, 20), math.radians(10), math.radians(170), 3)
+SHAKE_X_START = 280 
+PLANTS = [ "🌱 Seed", "🌿 Sprout", "🌵 Baby Cactus", "🌴 Small Palm", "🌳 Big Tree" ]
+MAX_PLANT_LEVEL = len(PLANTS) - 1
 
-# ---------------- Main Loop ----------------
-game = MagicGarden()
-game.new_question()
-
+game = MagicGardenGame()
+clock = pygame.time.Clock()
 running = True
+
 while running:
-    dt = clock.tick(FPS)
-    mx,my = pygame.mouse.get_pos()
+    
+    # --- Διαχείριση Events ---
+    for event in pygame.event.get():
+        if event.type == pygame.QUIT:
+            game.save_player_data() 
+            running = False
+        
+        # --- LOGIN STATE ---
+        if game.state == "login":
+            player_name = game.login_screen.handle_event(event)
+            if player_name:
+                game.load_player_data(player_name)
+        
+        # --- PLAYING STATE ---
+        elif game.state == "playing":
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_BACKSPACE:
+                    game.answer_text = game.answer_text[:-1]
+                elif event.key == pygame.K_RETURN:
+                    game.submit_answer()
+                elif event.unicode.isdigit():
+                    if len(game.answer_text) < 4:
+                        game.answer_text += event.unicode
 
-    # Εκδηλώσεις
-    for event in pygame.event.get():
-        if event.type == pygame.QUIT:
-            running = False
+    # ------------------ DRAWING ------------------
+    
+    # --- SPLASH SCREEN ---
+    if game.state == "splash":
+        if BACKGROUND_IMAGE:
+            screen.blit(BACKGROUND_IMAGE, (0, 0))
+        else:
+            screen.fill(LIGHT_BLUE)
+            draw_text_center(screen, "Magic Garden", HEIGHT // 2, big_font, BLACK)
+            
+        # Έλεγχος χρόνου
+        if pygame.time.get_ticks() - game.splash_start_time > game.splash_duration:
+            game.state = "login" # Μετάβαση στην οθόνη σύνδεσης
 
-        if game.state == "menu":
-            if event.type == pygame.MOUSEBUTTONDOWN:
-                if btn_start.clicked(mx,my):
-                    sound_click.play()
-                    game = MagicGarden()
-                    game.selected_table = None
-                    game.new_question()
-                    game.state = "playing"
-                    game.start_time = datetime.now().isoformat()
-                if btn_all.clicked(mx,my):
-                    sound_click.play()
-                    game = MagicGarden()
-                    game.selected_table = None
-                    game.new_question()
-                    game.state = "playing"
-                    game.start_time = datetime.now().isoformat()
-                for idx,b in enumerate(table_buttons, start=1):
-                    if b.clicked(mx,my):
-                        sound_click.play()
-                        game = MagicGarden()
-                        game.selected_table = idx
-                        game.new_question()
-                        game.state = "playing"
-                        game.start_time = datetime.now().isoformat()
-                if btn_quit.clicked(mx,my):
-                    sound_click.play()
-                    running = False
+    # --- LOGIN ---
+    elif game.state == "login":
+        game.login_screen.draw(screen)
 
-        elif game.state == "playing":
-            if event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_BACKSPACE:
-                    game.answer_text = game.answer_text[:-1]
-                elif event.key == pygame.K_RETURN:
-                    res = game.submit_answer()
-                    # μετά από υποβολή, αν τελείωσε γύρος
-                    if game.asked >= game.max_questions:
-                        game.end_time = datetime.now().isoformat()
-                        game.state = "results"
-                    else:
-                        game.new_question()
-                elif event.unicode.isdigit():
-                    if len(game.answer_text) < 4:
-                        game.answer_text += event.unicode
-            if event.type == pygame.MOUSEBUTTONDOWN:
-                if btn_quit.clicked(mx,my):
-                    sound_click.play()
-                    running = False
+    # --- PLAYING ---
+    elif game.state == "playing":
+        
+        if BACKGROUND_IMAGE:
+            screen.blit(BACKGROUND_IMAGE, (0, 0))
+        else:
+            screen.fill((230,245,255))
 
-        elif game.state == "results":
-            if event.type == pygame.MOUSEBUTTONDOWN:
-                # κλικ πάροδος: επιστροφή στο μενού
-                sound_click.play()
-                game.state = "menu"
-            if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
-                running = False
+        # Avatar του Παίκτη
+        avatar_text = big_font.render(AVATAR_ICONS[game.avatar_index], True, DARK_PURPLE)
+        screen.blit(avatar_text, (20, 20))
+        
+        # background elements
+        draw_text(screen, f"Παίκτης: {game.current_player}", (80, 40), small_font, BLACK)
+        draw_text(screen, f"Φυτό: {PLANTS[game.plant_level]}", (20, 100), small_font, GREEN)
+        draw_text(screen, f"Σκορ: {game.score}", (680, 20), small_font, PURPLE)
+        draw_text(screen, f"Streak: {game.streak}", (680, 50), small_font, PURPLE)
 
-    # Update μικρών κινήσεων
-    if game.state == "playing":
-        game.update_fairy()
-        # decay pop scale
-        if game.plant_pop_scale > 1.0:
-            game.plant_pop_scale -= 0.01
-            if game.plant_pop_scale < 1.0:
-                game.plant_pop_scale = 1.0
+        # animation logic
+        shake_x = SHAKE_X_START
+        if game.animation:
+            elapsed = pygame.time.get_ticks() - game.animation_timer
+            progress = elapsed / game.animation_duration
+            
+            if progress >= 1:
+                game.animation = None
+            else:
+                if game.animation == "correct_burst":
+                    draw_correct_burst(screen, WIDTH // 2, 180, progress)
+                if game.animation == "wrong":
+                    shake_x = apply_shake(SHAKE_X_START, 10, progress)
+                if game.animation == "grow":
+                    draw_growth_pop(screen, 130, 120, progress)
+        
+        # 🌳 Σχεδίαση του Φυτού 
+        plant_icon = big_font.render(PLANTS[game.plant_level].split(' ')[0], True, BLACK)
+        screen.blit(plant_icon, (150, 80))
+        
+        # question
+        a, b = game.current_q
+        question_text = big_font.render(f"{a} x {b} = ?", True, BLACK)
+        q_rect = question_text.get_rect(center=(WIDTH // 2 + (shake_x - SHAKE_X_START), 180))
+        screen.blit(question_text, q_rect)
 
-    # Σχεδίαση οθόνης
-    screen.fill(BG)
+        # answer box
+        answer_box_w, answer_box_h = 200, 80
+        answer_box_x = (WIDTH - answer_box_w) // 2 + (shake_x - SHAKE_X_START)
+        answer_box_y = 260
+        
+        pygame.draw.rect(screen, WHITE, (answer_box_x, answer_box_y, answer_box_w, answer_box_h), border_radius=10)
+        
+        answer_label = big_font.render(game.answer_text, True, BLACK)
+        ans_rect = answer_label.get_rect(center=(answer_box_x + answer_box_w // 2, answer_box_y + answer_box_h // 2))
+        screen.blit(answer_label, ans_rect)
 
-    # ----- MENU -----
-    if game.state == "menu":
-        # τίτλος καρτουνίστικος
-        pygame.draw.ellipse(screen, LIGHT, (40,20,920,120))
-        title_surf = BIG.render("ΜΑΓΙΚΟΣ ΚΗΠΟΣ ΠΡΟΠΑΙΔΕΙΩΝ 🌟", True, TITLE)
-        screen.blit(title_surf, (60,40))
-        subtitle = MED.render("Διασκέδαση & μάθηση — Διάλεξε προπαίδεια ή όλες", True, TEXT)
-        screen.blit(subtitle, (60,110))
+        draw_text(screen, "Πατήστε ENTER για απάντηση", (answer_box_x, 360), small_font, BLACK)
 
-        # fairy αριστερά
-        draw_fairy(screen, 140, 300, game.fairy_offset)
 
-        # καρτέλες επιλογής
-        btn_all.draw(screen)
-        for b in table_buttons:
-            b.draw(screen)
-        btn_start.draw(screen)
-        btn_quit.draw(screen)
+    pygame.display.update()
+    clock.tick(60)
 
-        # progress summary
-        pygame.draw.rect(screen, CARD, (60,270,400,180), border_radius=16)
-        draw_text = SMALL.render
-        screen.blit(MED.render("Στατιστικά", True, TITLE), (80,280))
-        screen.blit(SMALL.render(f"Συνολικές ερωτήσεις: {progress['total_played']}", True, TEXT), (80,320))
-        screen.blit(SMALL.render(f"Σωστές: {progress['total_correct']}", True, TEXT), (80,350))
-        screen.blit(SMALL.render("Επίδοση ανά προπαίδεια:", True, TEXT), (80,380))
-        for i in range(1,11):
-            s = progress["by_table"].get(str(i), {"asked":0,"correct":0})
-            screen.blit(SMALL.render(f"{i}x : {s['correct']}/{s['asked']}", True, TEXT), (100, 380 + i*18))
-
-        # μικρό tip δεξιά
-        tip_box = pygame.Rect(500, 270, 420, 180)
-        pygame.draw.rect(screen, LIGHT, tip_box, border_radius=14)
-        screen.blit(SMALL.render("Συμβουλή για Γονείς:", True, TITLE), (520,280))
-        screen.blit(SMALL.render("- Κάντε 2 γύρους την ημέρα", True, TEXT), (520,310))
-        screen.blit(SMALL.render("- Επιβραβεύστε το φυτό στο 4/4", True, TEXT), (520,340))
-        screen.blit(SMALL.render("- Επιλέξτε συγκεκριμένη προπαίδεια για στοχευμένη εξάσκηση", True, TEXT), (520,370))
-
-    # ----- PLAYING -----
-    elif game.state == "playing":
-        # question card
-        pygame.draw.rect(screen, CARD, (40,30,520,220), border_radius=18)
-        # handle animation effects
-        shake_x = 40
-        if game.animation:
-            elapsed = pygame.time.get_ticks() - game.animation_timer
-            progress_anim = elapsed / max(1, game.animation_duration)
-            if progress_anim >= 1:
-                game.animation = None
-            else:
-                if game.animation == "success":
-                    draw_success_animation(screen, 300, 130, progress_anim)
-                if game.animation == "wrong":
-                    shake_x = apply_shake(40, 12, progress_anim)
-                if game.animation == "grow":
-                    draw_growth_pop(screen, WIDTH-170, 170, progress_anim)
-
-        # ερώτηση
-        qtxt = f"{game.current_q[0]}  ×  {game.current_q[1]}  =  ?"
-        screen.blit(BIG.render(qtxt, True, TITLE), (shake_x, 70))
-
-        # input box
-        input_rect = pygame.Rect(60, 150, 220, 80)
-        pygame.draw.rect(screen, (255,255,255), input_rect, border_radius=12)
-        pygame.draw.rect(screen, (230,200,230), input_rect, 4, border_radius=12)
-        screen.blit(BIG.render(game.answer_text, True, TITLE), (input_rect.x+18, input_rect.y+18))
-
-        # little tip and streak
-        screen.blit(SMALL.render(f"Σειρά σωστών: {game.streak}", True, TEXT), (60, 245))
-        screen.blit(SMALL.render(f"Σκορ: {game.score} / Στόχος: {game.max_questions}", True, TEXT), (260, 245))
-
-        # draw plant big on right
-        pygame.draw.rect(screen, CARD, (580, 30, 360, 420), border_radius=18)
-        screen.blit(MED.render("Ο κήπος σου", True, TITLE), (600, 40))
-        draw_cartoon_plant(screen, game.plant_level, 760, 200, pop_scale=game.plant_pop_scale)
-        screen.blit(SMALL.render("Φυτό", True, TEXT), (700, 330))
-
-        # buttons: quit
-        btn_quit.draw(screen)
-
-        # repeat-pool indicator
-        screen.blit(SMALL.render(f"Επαναλήψεις σε ουρά: {len(game.repeat_pool)}", True, TEXT), (600, 370))
-
-    # ----- RESULTS -----
-    elif game.state == "results":
-        pygame.draw.rect(screen, CARD, (60,40,880,600), border_radius=18)
-        screen.blit(BIG.render("Τέλος Γύρου!", True, TITLE), (80,60))
-        screen.blit(MED.render(f"Σκορ: {game.score} / {game.max_questions}", True, TEXT), (80,140))
-        pct = int((game.score / max(1, game.max_questions)) * 100)
-        screen.blit(MED.render(f"Ποσοστό σωστών: {pct}%", True, TEXT), (80,190))
-        screen.blit(SMALL.render("Πρόσφατο Ιστορικό:", True, TEXT), (80,240))
-
-        # εμφανίζει 8 πιο πρόσφατα
-        y = 280
-        for h in progress["history"][-8:]:
-            mark = "✓" if h["ok"] else "✗"
-            col = (20,200,120) if h["ok"] else (240,80,80)
-            screen.blit(SMALL.render(f"{h['question']} → {h['given']} ({h['correct']}) {mark}", True, col), (80, y))
-            y += 28
-
-        screen.blit(SMALL.render("Κάνε κλικ οπουδήποτε για να επιστρέψεις στο μενού.", True, TEXT), (80, y+20))
-        btn_menu_back.draw(screen)
-        btn_quit.draw(screen)
-
-    pygame.display.flip()
-
+# Εξασφάλιση αποθήκευσης όταν κλείνει το παιχνίδι
+game.save_player_data()
 pygame.quit()
-
-# ---------------- Οδηγίες για PyInstaller (σημείωση) ----------------
-# Αν θες να το μετατρέψεις σε .exe:
-# pip install pyinstaller
-# pyinstaller --onefile --windowed magic_garden_cartoon.py
-# Αν θέλεις να συμπεριλάβεις icons/ήχους, χρησιμοποίησε --add-data
-
-
+sys.exit()

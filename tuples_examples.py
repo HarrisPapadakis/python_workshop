@@ -1,22 +1,23 @@
-# Παραδείγματα πλειάδων (tuples) στην Python
+# Πρόγραμμα εξάσκησης σε πλειάδες (tuples)
 
-# Δημιουργία πλειάδας με διαφορετικούς τύπους δεδομένων
-tup = (5, 'Welcome', 7, 'Geeks')
-print(tup)
+# Πλειάδα με αριθμούς και συμβολοσειρές
+data = (10, "Python", 3.14, "Tuples")
+print("Αρχική πλειάδα:", data)
 
-# Δημιουργία πλειάδας με εμφωλευμένες πλειάδες
-tup1 = (0, 1, 2, 3)
-tup2 = ('python', 'geek')
-tup3 = (tup1, tup2)
-print(tup3)
+# Πλειάδες μέσα σε πλειάδα
+numbers = (1, 2, 3)
+words = ("code", "learn")
+combined = (numbers, words)
+print("Εμφωλευμένη πλειάδα:", combined)
 
-# Δημιουργία πλειάδας με επανάληψη
-tup1 = ('Geeks',) * 3
-print(tup1)
+# Πλειάδα με επαναλαμβανόμενα στοιχεία
+repeat_tuple = ("IT",) * 4
+print("Πλειάδα με επανάληψη:", repeat_tuple)
 
-# Δημιουργία πλειάδας με χρήση βρόχου
-tup = ('Geeks')
-n = 5
-for i in range(int(n)):
-    tup = (tup,)
-    print(tup)
+# Δημιουργία πλειάδας σταδιακά με επανάληψη
+value = "Start"
+times = 4
+
+for i in range(times):
+    value = (value,)
+    print(f"Βήμα {i + 1}:", value)
